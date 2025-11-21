@@ -1,0 +1,15 @@
+openai
+python-dotenv
+yfinance
+pandas
+numpy
+colorama
+feedparser
+matplotlib
+streamlit
+plotly
+streamlit-lightweight-charts-v5
+finvizfinance
+beautifulsoup4
+requests
+
