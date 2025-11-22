@@ -12,4 +12,4 @@ streamlit-lightweight-charts-v5
 finvizfinance
 beautifulsoup4
 requests
-
+openpyxl
