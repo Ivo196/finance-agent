@@ -545,10 +545,10 @@ def main():
                         st.caption("ADX por Ticker (25+ tendencia fuerte)")
                 
                 with tab_debug3:
-                    st.subheader("Noticias Completas")
+                    st.subheader("Reportes de Analistas (Detalle)")
                     for idx, row in excel_data['df_news'].iterrows():
-                        with st.expander(f"📰 {row['Ticker']}"):
-                            st.write(row['Noticias'])
+                        with st.expander(f"� Reporte: {row['Ticker']}"):
+                            st.markdown(row['Reporte_Analista'])
                 
                 with tab_debug4:
                     st.subheader("Prompt Enviado al LLM")

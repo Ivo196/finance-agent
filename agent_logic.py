@@ -273,18 +273,5 @@ def recommend_capital_distribution(capital_amount, tickers_data, model="gpt-5.1"
             df_individual.to_excel(writer, sheet_name='Individual_Reports', index=False)
             df_response.to_excel(writer, sheet_name='Final_Verdict', index=False)
             df_technical.to_excel(writer, sheet_name='Technical_Data', index=False)
-            
-        excel_data = {
-            'filename': filename,
-            'df_resumen': df_resumen,
-            'df_technical': df_technical, 
-            'df_news': df_individual, # Reusing this slot for reports in the UI
-            'df_prompt': pd.DataFrame({'Prompt': [boss_system_prompt]}),
-            'df_response': df_response
-        }
-        
-        return final_verdict, excel_data, metrics
-
-    except Exception as e:
         print(Fore.RED + f"ERROR en recommend_capital_distribution: {e}")
         return f"Error: {str(e)}", None, None
