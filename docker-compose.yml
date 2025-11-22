@@ -1,0 +1,14 @@
+version: '3.8'
+
+services:
+  finance-agent:
+    build: .
+    container_name: finance-agent
+    ports:
+      - "${APP_PORT:-8501}:8501"
+    volumes:
+      - .:/app
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      # Add other environment variables here if needed
+    restart: unless-stopped

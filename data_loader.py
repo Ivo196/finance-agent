@@ -6,6 +6,29 @@ from colorama import Fore, Style, init
 
 init(autoreset=True)
 
+def _truncate_description(text: str, max_length: int = 250) -> str:
+    """
+    Smart truncation that cuts at sentence boundaries when possible.
+    Keeps descriptions concise (200-300 chars) to optimize context window.
+    """
+    if not text or len(text) <= max_length:
+        return text
+    
+    # Try to cut at sentence boundary
+    truncated = text[:max_length]
+    
+    # Look for sentence endings (., !, ?)
+    last_period = max(truncated.rfind('.'), truncated.rfind('!'), truncated.rfind('?'))
+    
+    if last_period > max_length * 0.6:  # Only cut at sentence if it's not too short
+        return truncated[:last_period + 1]
+    else:
+        # Cut at word boundary
+        last_space = truncated.rfind(' ')
+        if last_space > 0:
+            return truncated[:last_space] + '...'
+        return truncated + '...'
+
 def classify_trend(hist):
     """
     Robust trend classification using ADX + EMA position + EMA slope.
@@ -118,8 +141,16 @@ def get_market_data(ticker, interval="1d", fetch_news=True):
                         date_str = n.get('published', 'Reciente')
                         title = n.get('title', 'Sin título')
                         source = n.get('source', 'Desconocido')
-                        # Format: [YYYY-MM-DD HH:MM] (Source) Title
-                        news_summary.append(f"- [{date_str}] ({source}) {title}")
+                        description = n.get('description', '')
+                        
+                        # Truncate description for context optimization
+                        truncated_desc = _truncate_description(description) if description else ''
+                        
+                        # Format: [YYYY-MM-DD HH:MM] (Source) Title: Description...
+                        if truncated_desc:
+                            news_summary.append(f"- [{date_str}] ({source}) {title}: {truncated_desc}")
+                        else:
+                            news_summary.append(f"- [{date_str}] ({source}) {title}")
                 else:
                      print(Fore.RED + "   [News] ❌ No se encontraron noticias en ninguna fuente.")
 
@@ -196,7 +227,16 @@ def get_multi_timeframe_data(ticker):
             date_str = n.get('published', 'Reciente')
             title = n.get('title', 'Sin título')
             source = n.get('source', 'Desconocido')
-            news_summary.append(f"- [{date_str}] ({source}) {title}")
+            description = n.get('description', '')
+            
+            # Truncate description for context optimization
+            truncated_desc = _truncate_description(description) if description else ''
+            
+            # Format with description if available
+            if truncated_desc:
+                news_summary.append(f"- [{date_str}] ({source}) {title}: {truncated_desc}")
+            else:
+                news_summary.append(f"- [{date_str}] ({source}) {title}")
     else:
          print(Fore.RED + "   [News] ❌ No se encontraron noticias en ninguna fuente.")
          news_summary.append("No se encontraron noticias recientes.")

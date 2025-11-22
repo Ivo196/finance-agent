@@ -18,10 +18,44 @@ class NewsAgent(ABC):
             "title": str,
             "link": str,
             "published": str (YYYY-MM-DD HH:MM),
-            "timestamp": float (unix timestamp for sorting)
+            "timestamp": float (unix timestamp for sorting),
+            "description": str (optional - article summary/preview)
         }
         """
         pass
+    
+    @staticmethod
+    def _filter_by_date(pub_date: datetime, cutoff_date: datetime) -> bool:
+        """
+        Shared date filtering logic to avoid code duplication.
+        Returns True if the news item should be included.
+        """
+        return pub_date >= cutoff_date
+    
+    @staticmethod
+    def _clean_title(title: str) -> str:
+        """
+        Aggressive title cleaning for better deduplication.
+        Removes common words, punctuation, normalizes whitespace.
+        """
+        import re
+        import string
+        
+        # Lowercase
+        title = title.lower()
+        
+        # Remove common noise words that differ between sources
+        noise_words = ['stock', 'news', 'breaking', 'update', 'alert', 'report', 
+                       'analysis', 'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at']
+        words = title.split()
+        words = [w for w in words if w not in noise_words]
+        
+        # Join and remove all punctuation and whitespace
+        clean = ''.join(words)
+        clean = clean.translate(str.maketrans('', '', string.punctuation))
+        clean = re.sub(r'\s+', '', clean)
+        
+        return clean
 
 class GoogleNewsAgent(NewsAgent):
     def get_news(self, ticker: str, days: int = 7) -> list[dict]:
@@ -51,13 +85,21 @@ class GoogleNewsAgent(NewsAgent):
                     # Double check date just in case
                     if (datetime.now() - dt).days > days + 1:
                         continue
+                    
+                    # Extract description/summary from RSS feed
+                    description = ""
+                    if hasattr(entry, 'summary'):
+                        description = entry.summary
+                    elif hasattr(entry, 'description'):
+                        description = entry.description
 
                     news_items.append({
                         "source": entry.source.title if hasattr(entry, 'source') else "Google News",
                         "title": entry.title,
                         "link": entry.link,
                         "published": dt.strftime('%Y-%m-%d %H:%M'),
-                        "timestamp": dt.timestamp()
+                        "timestamp": dt.timestamp(),
+                        "description": description
                     })
         except Exception as e:
             print(f"Error in GoogleNewsAgent: {e}")
@@ -81,12 +123,19 @@ class YahooNewsAgent(NewsAgent):
                     if dt < cutoff_date:
                         continue
                     
+                    # Extract thumbnail or description if available
+                    description = ""
+                    if 'thumbnail' in n and 'resolutions' in n['thumbnail']:
+                        # Yahoo sometimes provides description in thumbnail metadata
+                        description = n.get('summary', '')
+                    
                     news_items.append({
                         "source": n.get('publisher', 'Yahoo Finance'),
                         "title": n.get('title', 'No Title'),
                         "link": n.get('link', '#'),
                         "published": dt.strftime('%Y-%m-%d %H:%M'),
-                        "timestamp": float(ts)
+                        "timestamp": float(ts),
+                        "description": description
                     })
         except Exception as e:
             print(f"Error in YahooNewsAgent: {e}")
@@ -122,7 +171,8 @@ class FinVizNewsAgent(NewsAgent):
                         "title": title,
                         "link": link,
                         "published": td_text, 
-                        "timestamp": datetime.now().timestamp() 
+                        "timestamp": datetime.now().timestamp(),
+                        "description": ""  # FinViz scraping doesn't provide easy description access
                     })
         except Exception as e:
             print(f"Error in FinVizNewsAgent: {e}")
@@ -142,13 +192,17 @@ class InvestingComAgent(NewsAgent):
                  
                  if dt < cutoff_date:
                      continue
+                 
+                 # Extract summary from RSS feed if available
+                 description = entry.get('summary', '')
 
                  news_items.append({
                     "source": "Investing.com",
                     "title": entry.title,
                     "link": entry.link,
                     "published": dt.strftime('%Y-%m-%d %H:%M'),
-                    "timestamp": dt.timestamp()
+                    "timestamp": dt.timestamp(),
+                    "description": description
                 })
         except Exception as e:
             print(f"Error in InvestingComAgent: {e}")
@@ -176,11 +230,11 @@ class NewsAggregator:
                 except Exception as exc:
                     print(f"Agent generated an exception: {exc}")
         
-        # Deduplicate by Title
+        # Deduplicate by Title with aggressive cleaning
         seen_titles = set()
         unique_news = []
         for item in all_news:
-            title_slug = ''.join(e for e in item['title'] if e.isalnum()).lower()
+            title_slug = NewsAgent._clean_title(item['title'])
             if title_slug not in seen_titles:
                 seen_titles.add(title_slug)
                 unique_news.append(item)

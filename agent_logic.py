@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 import json
 import time
 import io
+import traceback
 
 init(autoreset=True)
 
@@ -132,31 +133,37 @@ def analyze_individual_stock_deeply(ticker, data, model="gpt-5.1", reasoning_eff
     
     ### FORMATO DE RESPUESTA (MARKDOWN):
     
-    #### 🔎 Análisis Individual: {ticker}
+    ### 🔎 Intelligence Report: {ticker}
     
-    **1. Diagnóstico Técnico (Sin Sesgos)**
-    *   **Semanal (Macro)**: [Análisis objetivo. ¿Es alcista, bajista o lateral? ¿Por qué?]
-    *   **Diario (Timing)**: [Análisis de entrada. ¿Está caro o barato hoy? ¿RSI sobrecomprado?]
+    #### 1. Technical Diagnosis
+    *   **Weekly (Macro)**: [Objective analysis. Bullish/Bearish/Neutral? Why?]
+    *   **Daily (Timing)**: [Entry analysis. Cheap or Expensive today? RSI status?]
     
-    **2. Análisis de Noticias (Earnings Cycle)**
-    *   **Suelo Fundamental (Contexto 90d)**: [¿Qué dicen los últimos Earnings/Trimestre? ¿La empresa va bien?]
-    *   **Catalizador Inmediato (5d)**: [¿Hay noticias esta semana que justifiquen entrar YA?]
+    #### 2. Fundamental & News Analysis
+    *   **Fundamental Floor (90d Context)**: [Earnings/Growth trajectory?]
+    *   **Immediate Catalyst (5d)**: [Any news driving price TODAY?]
     
-    **3. CONCLUSIÓN Y TIMING**
-    *   **Veredicto**: [COMPRAR / VENDER / ESPERAR]
-    *   **Instrucción de Tiempo**: [Ej: "Compra HOY", "Espera 3 días", "Espera a que toque $XXX"]
-    *   **Razón**: [Justificación en 1 frase]
+    #### 3. Strategic Verdict
+    *   **Action**: [BUY / SELL / HOLD]
+    *   **Timing Instruction**: [e.g., "Buy NOW", "Wait 3 days", "Wait for $XXX"]
+    *   **Rationale**: [One sentence justification]
     """
 
     try:
-        response = client.chat.completions.create(
-            model=valid_model,
-            messages=[
+        # Prepare arguments
+        kwargs = {
+            "model": valid_model,
+            "messages": [
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": f"Analiza {ticker} ahora."}
-            ],
-            reasoning_effort=reasoning_effort if valid_model == "gpt-5.1" else None
-        )
+            ]
+        }
+        
+        # GPT-5.1 supports reasoning_effort
+        if valid_model == "gpt-5.1":
+            kwargs["reasoning_effort"] = reasoning_effort
+
+        response = client.chat.completions.create(**kwargs)
         
         analysis = response.choices[0].message.content
         
@@ -174,9 +181,10 @@ def analyze_individual_stock_deeply(ticker, data, model="gpt-5.1", reasoning_eff
         return analysis, metrics
 
     except Exception as e:
+        traceback.print_exc()
         return f"❌ Error analizando {ticker}: {str(e)}", None
 
-def recommend_capital_distribution(capital_amount, tickers_data, model="gpt-5.1", reasoning_effort="none"):
+def recommend_capital_distribution(capital_amount, tickers_data, model="gpt-5.1", reasoning_effort="none", progress_callback=None):
     """
     Genera una recomendación de distribución de capital basada en análisis individuales profundos.
     """
@@ -184,7 +192,9 @@ def recommend_capital_distribution(capital_amount, tickers_data, model="gpt-5.1"
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     valid_model = _validate_model_name(model)
     
-    print(Fore.CYAN + f"\n🚀 Iniciando Análisis Profundo de {len(tickers_data)} activos...")
+    msg = f"🚀 Iniciando Análisis Profundo de {len(tickers_data)} activos..."
+    print(Fore.CYAN + f"\n{msg}")
+    if progress_callback: progress_callback(msg)
     
     # --- FASE 1: ANÁLISIS INDIVIDUAL (Iterativo) ---
     individual_reports = []
@@ -194,7 +204,10 @@ def recommend_capital_distribution(capital_amount, tickers_data, model="gpt-5.1"
     debug_prompts = []
     
     for ticker, data in tickers_data.items():
-        print(Fore.YELLOW + f"   [Agent] Analizando {ticker} individualmente...")
+        msg = f"   [Agent] Analizando {ticker} individualmente..."
+        print(Fore.YELLOW + msg)
+        if progress_callback: progress_callback(f"🕵️ Analizando {ticker}...")
+        
         report, metrics = analyze_individual_stock_deeply(ticker, data, model, reasoning_effort)
         
         if metrics:
@@ -204,7 +217,9 @@ def recommend_capital_distribution(capital_amount, tickers_data, model="gpt-5.1"
         debug_prompts.append(f"ANÁLISIS {ticker}:\n{report}")
 
     # --- FASE 2: EL JEFE (Asignación de Capital) ---
-    print(Fore.CYAN + "   [Agent] Generando decisión final de asignación (El Jefe)...")
+    msg = "   [Agent] Generando decisión final de asignación (El Jefe)..."
+    print(Fore.CYAN + msg)
+    if progress_callback: progress_callback("🧠 El Jefe está decidiendo la asignación de capital...")
     
     all_reports_text = "\n".join(individual_reports)
     
@@ -224,28 +239,28 @@ def recommend_capital_distribution(capital_amount, tickers_data, model="gpt-5.1"
     
     ### FORMATO DE REPORTE FINAL:
     
-    # 🏛️ REPORTE DE ESTRATEGIA DE INVERSIÓN
+    ## 🏛️ Investment Strategy Report
     
-    ## 1. RESUMEN EJECUTIVO
-    *   **Sentimiento General del Portafolio**: [Alcista/Bajista/Mixto]
-    *   **Mejor Oportunidad Hoy**: [Ticker]
+    ### 1. Executive Summary
+    *   **Portfolio Sentiment**: [Bullish/Bearish/Mixed]
+    *   **Top Pick Today**: [Ticker]
     
-    ## 2. ANÁLISIS INDIVIDUAL DETALLADO
-    (Aquí resume brevemente lo más importante de cada reporte individual que recibiste, conservando el consejo de timing)
+    ### 2. Asset Analysis Breakdown
+    (Briefly summarize key points from individual reports, keeping timing advice)
     
-    *   **[TICKER]**: [Veredicto del Analista] -> [Instrucción de Timing: Ej. "Esperar 3 días"]
+    *   **[TICKER]**: [Verdict] -> [Timing Instruction]
     *   ...
     
-    ## 3. ASIGNACIÓN DE CAPITAL (${capital_amount})
+    ### 3. Capital Allocation Strategy (${capital_amount})
     
-    | Activo | Acción | Monto ($) | Instrucción Precisa |
+    | Asset | Action | Amount ($) | Precise Instruction |
     | :--- | :--- | :--- | :--- |
-    | **AAPL** | COMPRAR | $100 | Entrar a mercado ahora. |
-    | **TSLA** | ESPERAR | $50 | Reservar. Esperar 3 días a rebote en $200. |
-    | **CASH** | MANTENER | $150 | No hay suficientes oportunidades claras hoy. |
+    | **AAPL** | BUY | $100 | Enter market now. |
+    | **TSLA** | HOLD | $50 | Reserve. Wait 3 days for bounce at $200. |
+    | **CASH** | KEEP | $150 | Insufficient opportunities today. |
     
-    ## 4. PLAN DE ACCIÓN PARA LA SEMANA
-    *   [Instrucciones finales para el inversor sobre qué monitorear]
+    ### 4. Weekly Action Plan
+    *   [Final instructions for the investor]
     """
     
     boss_user_prompt = f"""
@@ -257,14 +272,19 @@ def recommend_capital_distribution(capital_amount, tickers_data, model="gpt-5.1"
     """
     
     try:
-        response = client.chat.completions.create(
-            model=valid_model,
-            messages=[
+        # Prepare arguments for Boss
+        kwargs = {
+            "model": valid_model,
+            "messages": [
                 {"role": "system", "content": boss_system_prompt},
                 {"role": "user", "content": boss_user_prompt}
-            ],
-            reasoning_effort=reasoning_effort if valid_model == "gpt-5.1" else None
-        )
+            ]
+        }
+        
+        if valid_model == "gpt-5.1":
+            kwargs["reasoning_effort"] = reasoning_effort
+
+        response = client.chat.completions.create(**kwargs)
         
         final_verdict = response.choices[0].message.content
         
@@ -337,4 +357,5 @@ def recommend_capital_distribution(capital_amount, tickers_data, model="gpt-5.1"
 
     except Exception as e:
         print(Fore.RED + f"ERROR en recommend_capital_distribution: {e}")
+        traceback.print_exc()
         return f"Error: {str(e)}", None, None

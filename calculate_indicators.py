@@ -1,6 +1,26 @@
 import numpy as np # Necesitamos numpy para cálculos vectoriales
 import pandas as pd
 
+def wilder_smoothing(data, period=14):
+    """
+    Implements Wilder's Smoothing (RMA/SMMA) - the correct method for ADX calculation.
+    
+    Wilder's formula: smoothed[i] = (smoothed[i-1] * (period - 1) + current_value) / period
+    First value uses simple moving average as seed.
+    
+    This is different from EMA and produces values matching TradingView/Yahoo Finance.
+    """
+    result = pd.Series(index=data.index, dtype=float)
+    
+    # First value: simple moving average
+    result.iloc[period - 1] = data.iloc[:period].mean()
+    
+    # Subsequent values: Wilder's smoothing
+    for i in range(period, len(data)):
+        result.iloc[i] = (result.iloc[i - 1] * (period - 1) + data.iloc[i]) / period
+    
+    return result
+
 def calculate_indicators(hist):
     # 1. EMAs existentes
     hist['EMA_20'] = hist['Close'].ewm(span=20, adjust=False).mean()
@@ -35,19 +55,30 @@ def calculate_indicators(hist):
     low_close = np.abs(hist['Low'] - hist['Close'].shift())
     ranges = pd.concat([high_low, high_close, low_close], axis=1)
     true_range = np.max(ranges, axis=1)
-    hist['ATR'] = true_range.rolling(14).mean()
+    # Use Wilder smoothing for ATR (industry standard)
+    hist['ATR'] = wilder_smoothing(true_range, period=14)
 
     # --- NUEVO: ADX (Average Directional Index) ---
+    # Wilder's ADX calculation (industry standard matching TradingView/Yahoo)
     plus_dm = hist['High'].diff()
     minus_dm = hist['Low'].diff()
     plus_dm[plus_dm < 0] = 0
     minus_dm[minus_dm > 0] = 0
     
-    tr14 = true_range.rolling(14).sum()
-    plus_di14 = 100 * (plus_dm.ewm(alpha=1/14).mean() / tr14)
-    minus_di14 = 100 * (minus_dm.abs().ewm(alpha=1/14).mean() / tr14)
-    dx = 100 * np.abs((plus_di14 - minus_di14) / (plus_di14 + minus_di14))
-    hist['ADX'] = dx.rolling(14).mean()
+    # Smooth the directional movements and true range using Wilder's method
+    smoothed_plus_dm = wilder_smoothing(plus_dm, period=14)
+    smoothed_minus_dm = wilder_smoothing(minus_dm.abs(), period=14)
+    smoothed_tr = wilder_smoothing(true_range, period=14)
+    
+    # Calculate +DI and -DI
+    plus_di = 100 * (smoothed_plus_dm / smoothed_tr)
+    minus_di = 100 * (smoothed_minus_dm / smoothed_tr)
+    
+    # Calculate DX
+    dx = 100 * np.abs((plus_di - minus_di) / (plus_di + minus_di))
+    
+    # ADX is Wilder smoothing of DX
+    hist['ADX'] = wilder_smoothing(dx, period=14)
 
     # --- NUEVO: Stochastic Oscillator ---
     low_min = hist['Low'].rolling(14).min()

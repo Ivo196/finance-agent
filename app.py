@@ -6,6 +6,10 @@ from colorama import Fore, Style, init
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from datetime import datetime, timedelta
+import warnings
+
+# Suppress specific Streamlit RuntimeWarning
+warnings.filterwarnings("ignore", category=RuntimeWarning, module="streamlit.util")
 
 init(autoreset=True)
 
@@ -20,102 +24,147 @@ st.set_page_config(
 # --- ESTILOS CSS PERSONALIZADOS (DARK PRO THEME) ---
 st.markdown("""
 <style>
-    /* Fondo general y fuentes */
+    /* --- GLOBAL THEME & TYPOGRAPHY --- */
     .stApp {
-        background-color: #0e1117;
-        font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        background-color: #0b0e11; /* Deep Space Black */
+        font-family: 'Inter', 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
     }
     
-    /* Tarjetas de Métricas */
-    div[data-testid="stMetric"] {
-        background-color: #161b22;
-        padding: 20px;
-        border-radius: 12px;
-        border-left: 6px solid #00cc66;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
-        transition: transform 0.2s;
-    }
-    div[data-testid="stMetric"]:hover {
-        border-left-color: #00ff88;
-        transform: translateY(-5px);
-        box-shadow: 0 8px 15px rgba(0, 255, 136, 0.1);
-    }
-    div[data-testid="stMetric"] label {
-        font-size: 1.1rem !important;
-        color: #8b949e !important;
-    }
-    div[data-testid="stMetric"] div[data-testid="stMetricValue"] {
-        font-size: 2.2rem !important;
-        font-weight: 700 !important;
-        color: #e6e6e6 !important;
-    }
-    
-    /* Botones */
-    .stButton>button {
-        width: 100%;
-        background: linear-gradient(90deg, #238636 0%, #2ea043 100%);
-        color: white;
-        border: none;
-        padding: 15px;
+    h1, h2, h3, h4, h5, h6 {
+        color: #f0f6fc;
         font-weight: 600;
-        font-size: 1.1rem;
-        border-radius: 8px;
-        text-transform: uppercase;
-        letter-spacing: 1.5px;
-        transition: all 0.3s ease;
-        box-shadow: 0 4px 12px rgba(46, 160, 67, 0.4);
+        letter-spacing: -0.02em;
     }
-    .stButton>button:hover {
-        background: linear-gradient(90deg, #2ea043 0%, #3fb950 100%);
-        box-shadow: 0 6px 18px rgba(46, 160, 67, 0.6);
-        transform: scale(1.02);
+    
+    h1 {
+        font-size: 2.8rem !important;
+        background: linear-gradient(90deg, #fff 0%, #a5d6ff 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        text-shadow: 0 0 30px rgba(165, 214, 255, 0.2);
+    }
+    
+    /* --- METRIC CARDS --- */
+    div[data-testid="stMetric"] {
+        background: linear-gradient(145deg, #161b22, #0d1117);
+        padding: 20px;
+        border-radius: 16px;
+        border: 1px solid #30363d;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+        transition: all 0.3s ease;
+        position: relative;
+        overflow: hidden;
+    }
+    
+    div[data-testid="stMetric"]::before {
+        content: "";
+        position: absolute;
+        top: 0; left: 0; width: 100%; height: 4px;
+        background: linear-gradient(90deg, #238636, #2ea043);
+        opacity: 0.8;
+    }
+    
+    div[data-testid="stMetric"]:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 12px 30px rgba(0, 0, 0, 0.6);
+        border-color: #58a6ff;
+    }
+    
+    div[data-testid="stMetric"] label {
+        font-size: 0.9rem !important;
+        color: #8b949e !important;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+    
+    div[data-testid="stMetric"] div[data-testid="stMetricValue"] {
+        font-size: 2rem !important;
+        font-weight: 700 !important;
+        color: #e6edf3 !important;
     }
 
-    /* Títulos y Headers */
-    h1 {
-        color: #e6e6e6;
-        font-weight: 800;
-        font-size: 3rem !important;
-        letter-spacing: -1px;
-        text-shadow: 0 2px 4px rgba(0,0,0,0.5);
-    }
-    h2, h3 {
-        color: #c9d1d9;
+    /* --- BUTTONS --- */
+    .stButton>button {
+        width: 100%;
+        background: linear-gradient(135deg, #238636 0%, #1a7f37 100%);
+        color: white;
+        border: 1px solid rgba(255,255,255,0.1);
+        padding: 0.75rem 1.5rem;
         font-weight: 600;
+        font-size: 1rem;
+        border-radius: 10px;
+        transition: all 0.2s ease;
+        box-shadow: 0 4px 12px rgba(35, 134, 54, 0.3);
+        text-transform: none; /* More modern look */
     }
     
-    /* Tabs */
-    .stTabs [data-baseweb="tab-list"] {
-        gap: 10px;
-        background-color: transparent;
+    .stButton>button:hover {
+        background: linear-gradient(135deg, #2ea043 0%, #238636 100%);
+        transform: translateY(-2px);
+        box-shadow: 0 8px 20px rgba(35, 134, 54, 0.5);
+        border-color: rgba(255,255,255,0.3);
     }
+    
+    .stButton>button:active {
+        transform: translateY(1px);
+    }
+
+    /* --- TABS --- */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 8px;
+        background-color: transparent;
+        margin-bottom: 20px;
+    }
+    
     .stTabs [data-baseweb="tab"] {
-        height: 60px;
-        white-space: pre-wrap;
-        background-color: #21262d;
+        height: 50px;
+        background-color: #0d1117;
         border-radius: 8px;
-        padding: 10px 25px;
+        padding: 0 24px;
         color: #8b949e;
         font-weight: 500;
-        border: 1px solid #30363d;
+        border: 1px solid #21262d;
         transition: all 0.2s;
     }
+    
     .stTabs [data-baseweb="tab"]:hover {
-        background-color: #30363d;
+        background-color: #161b22;
         color: #c9d1d9;
-    }
-    .stTabs [data-baseweb="tab"][aria-selected="true"] {
-        background-color: #238636;
-        color: white;
-        border-color: #2ea043;
-        box-shadow: 0 4px 12px rgba(35, 134, 54, 0.3);
+        border-color: #30363d;
     }
     
-    /* Status Container */
+    .stTabs [data-baseweb="tab"][aria-selected="true"] {
+        background-color: #1f6feb; /* Blue accent for tabs */
+        color: white;
+        border-color: #1f6feb;
+        box-shadow: 0 4px 12px rgba(31, 111, 235, 0.3);
+    }
+    
+    /* --- STATUS CONTAINER --- */
     .stStatus {
-        background-color: #161b22 !important;
+        background-color: #0d1117 !important;
         border: 1px solid #30363d !important;
-        border-radius: 10px !important;
+        border-radius: 12px !important;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.2) !important;
+    }
+    
+    /* --- DATAFRAME & TABLES --- */
+    div[data-testid="stDataFrame"] {
+        border: 1px solid #30363d;
+        border-radius: 8px;
+        overflow: hidden;
+    }
+    
+    /* --- SIDEBAR --- */
+    section[data-testid="stSidebar"] {
+        background-color: #010409;
+        border-right: 1px solid #21262d;
+    }
+    
+    /* --- DIVIDERS --- */
+    hr {
+        border-color: #21262d;
+        margin: 2em 0;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -220,86 +269,80 @@ def get_cached_market_data(ticker):
 
 def main():
     # Header Principal
-    col_logo, col_title = st.columns([1, 6])
+    col_logo, col_title = st.columns([1, 8])
     with col_logo:
-        st.markdown("<div style='font-size: 4rem; text-align: center;'>🤖</div>", unsafe_allow_html=True)
+        st.markdown("<div style='font-size: 3.5rem; text-align: center; animation: pulse 2s infinite;'>⚛️</div>", unsafe_allow_html=True)
     with col_title:
-        st.title("AI Finance Agent v5.0")
-        st.markdown("<h4 style='color: #00cc66;'>🚀 Advanced Technical Analysis & Portfolio Intelligence</h4>", unsafe_allow_html=True)
+        st.title("AI Finance Agent | Pro Terminal")
+        st.markdown("<h4 style='color: #8b949e; font-weight: 400;'>Institutional-Grade Market Intelligence & Portfolio Management</h4>", unsafe_allow_html=True)
     
     st.divider()
 
     # Sidebar
     with st.sidebar:
-        st.markdown("### ⚙️ Panel de Control")
-        ticker = st.text_input("Ticker Symbol", value="SPY", help="Ej: AAPL, BTC-USD, NVDA").upper()
+        st.markdown("### ⚙️ Control Center")
+        ticker = st.text_input("Asset Ticker", value="SPY", help="Enter symbol (e.g., AAPL, BTC-USD, NVDA)").upper()
         
-        # Selector de Timeframe (Visual only now, as logic uses both)
-        chart_interval = st.selectbox("Timeframe Gráfico", ["1d", "1wk", "1mo"], index=0)
+        # Selector de Timeframe
+        chart_interval = st.selectbox("Chart Timeframe", ["1d", "1wk", "1mo"], index=0)
 
         st.markdown("---")
-        st.markdown("### 🧠 Configuración AI")
-        model_info = st.selectbox("Modelo AI", ["GPT-5.1 (Latest)", "GPT-4o (Legacy)"], index=0)
+        st.markdown("### 🧠 Intelligence Core")
+        model_info = st.selectbox("AI Model", ["GPT-5.1 (Latest)", "GPT-4o (Legacy)"], index=0)
         
-        # Reasoning Effort Selector (Only for GPT-5.1)
+        # Reasoning Effort Selector
         reasoning_effort = "none"
         if "GPT-5.1" in model_info:
             reasoning_effort = st.select_slider(
-                "Esfuerzo de Razonamiento", 
+                "Reasoning Depth", 
                 options=["none", "low", "medium", "high"], 
                 value="none",
-                help="None: Más rápido (Default) | High: Mayor profundidad de pensamiento"
+                help="None: Fast | High: Deep Strategic Analysis"
             )
             
-
+        st.markdown("---")
+        analyze_btn = st.button("⚡ INITIALIZE ANALYSIS", use_container_width=True)
         
         st.markdown("---")
-        analyze_btn = st.button("🚀 EJECUTAR ANÁLISIS", use_container_width=True)
+        st.markdown("### 💼 Portfolio Manager")
+        capital_amount = st.number_input("Capital Allocation ($)", min_value=10.0, value=1000.0, step=100.0)
         
-        st.markdown("---")
-        st.markdown("### 💰 Distribución de Capital")
-        capital_amount = st.number_input("Monto a Invertir ($)", min_value=10.0, value=300.0, step=10.0, help="Ingresa cuánto dinero quieres invertir")
-        
-        # Tus acciones del portafolio (siempre incluidas)
         portfolio_tickers = ["AAPL", "NVDA", "TSLA"]
         
-        st.caption(f"📊 Tu Portfolio: {', '.join(portfolio_tickers)}")
+        st.caption(f"📊 Current Holdings: {', '.join(portfolio_tickers)}")
         
-        # Campo opcional para agregar más tickers
         additional_tickers_input = st.text_input(
-            "Agregar Tickers Adicionales (opcional)", 
-            placeholder="Ej: MSFT, GOOGL, SPY",
-            help="Separa los tickers con comas si quieres analizar activos adicionales"
+            "Add Assets to Analyze", 
+            placeholder="e.g., MSFT, GOOGL, SPY",
+            help="Comma separated list of assets"
         )
         
-        # Combinar tickers
         if additional_tickers_input.strip():
             additional_tickers = [t.strip().upper() for t in additional_tickers_input.split(",") if t.strip()]
             selected_tickers = portfolio_tickers + additional_tickers
-            st.caption(f"➕ Adicionales: {', '.join(additional_tickers)}")
+            st.caption(f"➕ Added: {', '.join(additional_tickers)}")
         else:
             selected_tickers = portfolio_tickers
         
-        distribute_btn = st.button("💡 RECOMENDAR DISTRIBUCIÓN", use_container_width=True)
+        distribute_btn = st.button("🧬 GENERATE STRATEGY", use_container_width=True)
         
         st.markdown("---")
-        st.caption(f"Status: Online | Model: {model_info}")
+        st.caption(f"System Status: ONLINE | Core: {model_info}")
 
     if analyze_btn:
-        print(Fore.GREEN + Style.BRIGHT + f"\n=== 🚀 NUEVO ANÁLISIS SOLICITADO: {ticker} ===")
+        print(Fore.GREEN + Style.BRIGHT + f"\n=== 🚀 NEW ANALYSIS REQUEST: {ticker} ===")
         
         # Container de Status Interactivo
-        with st.status("🚀 Iniciando secuencia de análisis...", expanded=True) as status:
+        with st.status("🔄 Initializing Analysis Sequence...", expanded=True) as status:
             
             try:
-                status.write("📡 **Paso 1/3: Conectando con mercados (Semanal + Diario)...**")
+                status.write("📡 **Phase 1: Establishing Market Uplink...**")
                 # 1. Obtener Datos Multi-Timeframe
                 data_bundle, error = get_cached_market_data(ticker)
                 
                 if error:
-                    status.update(label="❌ Error en la obtención de datos", state="error")
-                    st.error(f"**Error Crítico**: {error}")
-                    st.info("💡 **Sugerencias**: Verifica el ticker, tu conexión a internet, o prueba otro símbolo.")
+                    status.update(label="❌ Data Acquisition Failed", state="error")
+                    st.error(f"**Critical Error**: {error}")
                     return
                 
                 # Extract data for UI
@@ -311,7 +354,7 @@ def main():
                 daily_price = data_bundle['daily'].get('price')
                 daily_trend = data_bundle['daily'].get('trend')
                 
-                status.write(f"✅ Datos recibidos: Precio ${daily_price} | Tendencia {daily_trend}")
+                status.write(f"✅ Data Stream Secured: {ticker} @ ${daily_price} | Trend: {daily_trend}")
                 
                 model_map = {
                     "GPT-5.1 (Latest)": "gpt-5.1",  # GPT-4o is the latest available
@@ -319,17 +362,17 @@ def main():
                 }
                 selected_model = model_map.get(model_info, "gpt-5.1")
                 
-                status.write(f"🧠 **Paso 2/3: Analizando con {model_info}...**")
+                status.write(f"🧠 **Phase 2: Engaging Neural Engine ({model_info})...**")
                 
                 # 2. Ejecutar Agente con modelo seleccionado
                 analysis, metrics = analyze_stock(ticker, llm_data, model=selected_model, reasoning_effort=reasoning_effort)
 
-                status.write("✅ Análisis de inteligencia generado.")
-                status.update(label="✨ ¡Análisis Completado Exitosamente!", state="complete", expanded=False)
+                status.write("✅ Intelligence Report Generated.")
+                status.update(label="✨ Analysis Complete", state="complete", expanded=False)
 
             except Exception as e:
-                status.update(label="❌ Error Inesperado", state="error")
-                st.error(f"Ocurrió un error: {e}")
+                status.update(label="❌ System Error", state="error")
+                st.error(f"An error occurred: {e}")
                 print(Fore.RED + f"ERROR: {e}")
                 return
 
@@ -347,11 +390,11 @@ def main():
         # Determine metric color based on trend classification
         trend_color = "normal" if "Alcista" in trend else "inverse" if "Bajista" in trend else "off"
         
-        kpi1.metric("Precio Actual", f"${last_price}", delta=f"{hist_data['Close'].diff().iloc[-1]:.2f}")
-        kpi2.metric("Tendencia", trend, delta_color=trend_color, 
-                   help=f"ADX: {adx} - {'✅ Tendencia fuerte' if adx > 25 else '⚠️ Tendencia débil' if adx > 20 else '❌ Mercado lateral (evitar seguir tendencia)'}")
-        kpi3.metric("RSI (14)", rsi, delta="Sobrecompra" if rsi>70 else "Sobreventa" if rsi<30 else "Neutral", delta_color="off")
-        kpi4.metric("ADX (Fuerza)", f"{adx}", help="ADX > 25 indica tendencia fuerte.")
+        kpi1.metric("Current Price", f"${last_price}", delta=f"{hist_data['Close'].diff().iloc[-1]:.2f}")
+        kpi2.metric("Trend Status", trend, delta_color=trend_color, 
+                   help=f"ADX: {adx} - {'✅ Strong Trend' if adx > 25 else '⚠️ Weak Trend' if adx > 20 else '❌ Sideways Market'}")
+        kpi3.metric("RSI (14)", rsi, delta="Overbought" if rsi>70 else "Oversold" if rsi<30 else "Neutral", delta_color="off")
+        kpi4.metric("ADX Strength", f"{adx}", help="ADX > 25 indicates strong trend.")
 
         # Check for stale data
         last_updated_str = llm_data['daily'].get('last_updated', '')
@@ -369,7 +412,7 @@ def main():
         st.markdown("---")
 
         # Pestañas
-        tab1, tab2, tab3 = st.tabs(["📈 GRÁFICO TÉCNICO", "🧠 ANÁLISIS INTELIGENTE", "📰 NOTICIAS EN TIEMPO REAL"])
+        tab1, tab2, tab3 = st.tabs(["📈 TECHNICAL CHART", "🧠 AI ANALYSIS", "📰 LIVE NEWS"])
 
         with tab1:
             st.plotly_chart(create_dashboard(hist_data, ticker), use_container_width=True)
@@ -401,49 +444,49 @@ def main():
                 st.info("No se encontraron noticias recientes.")
             
             with st.expander("Ver Datos Crudos (OHLCV)"):
-                st.dataframe(hist_data.tail(20), width="stretch")
+                st.dataframe(hist_data.tail(20), use_container_width=True)
     
     # === NUEVA FUNCIONALIDAD: DISTRIBUCIÓN DE CAPITAL ===
     if distribute_btn:
         if not selected_tickers:
-            st.error("⚠️ Debes seleccionar al menos un ticker para analizar.")
+            st.error("⚠️ No assets selected for analysis.")
         else:
-            print(Fore.CYAN + Style.BRIGHT + f"\n=== 💰 DISTRIBUCIÓN DE CAPITAL: ${capital_amount} entre {len(selected_tickers)} activos ===")
+            print(Fore.CYAN + Style.BRIGHT + f"\n=== 💰 CAPITAL ALLOCATION: ${capital_amount} across {len(selected_tickers)} assets ===")
             
-            with st.status(f"💰 Analizando distribución de ${capital_amount}...", expanded=True) as status:
+            with st.status(f"🧬 Computing Optimal Allocation for ${capital_amount}...", expanded=True) as status:
                 try:
-                    status.write(f"📊 **Paso 1/3: Obteniendo datos de {len(selected_tickers)} activos...**")
+                    status.write(f"📊 **Phase 1: Aggregating Data for {len(selected_tickers)} Assets...**")
                     
                     # Obtener datos de cada ticker
                     tickers_data = {}
                     failed_tickers = []
                     
                     for ticker_symbol in selected_tickers:
-                        status.update(label=f"⏳ Obteniendo datos de {ticker_symbol}...", state="running")
-                        print(Fore.YELLOW + f"   [Debug] Procesando {ticker_symbol}...")
-                        status.write(f"🔄 Procesando {ticker_symbol}...")
+                        status.update(label=f"⏳ Scanning {ticker_symbol}...", state="running")
+                        print(Fore.YELLOW + f"   [Debug] Processing {ticker_symbol}...")
+                        status.write(f"🔄 Processing {ticker_symbol}...")
                         try:
                             # Use get_cached_market_data which now returns multi-timeframe bundle
                             data_bundle, error = get_cached_market_data(ticker_symbol)
                             
                             if error:
-                                status.write(f"⚠️ Error obteniendo datos de {ticker_symbol}: {error}")
+                                status.write(f"⚠️ Data Error {ticker_symbol}: {error}")
                                 failed_tickers.append(ticker_symbol)
                             else:
                                 tickers_data[ticker_symbol] = data_bundle
-                                status.write(f"✅ {ticker_symbol}: ${data_bundle['daily'].get('price')} | Tendencia: {data_bundle['daily'].get('trend')}")
+                                status.write(f"✅ {ticker_symbol}: ${data_bundle['daily'].get('price')} | Trend: {data_bundle['daily'].get('trend')}")
                         except Exception as e:
-                            print(Fore.RED + f"   [Debug] Excepción en {ticker_symbol}: {str(e)}")
-                            status.write(f"❌ Error con {ticker_symbol}: {str(e)}")
+                            print(Fore.RED + f"   [Debug] Exception {ticker_symbol}: {str(e)}")
+                            status.write(f"❌ Error {ticker_symbol}: {str(e)}")
                             failed_tickers.append(ticker_symbol)
                     
                     if not tickers_data:
-                        status.update(label="❌ No se pudo obtener datos de ningún ticker", state="error")
-                        st.error("No se pudo obtener datos de mercado. Intenta con otros tickers.")
+                        status.update(label="❌ Data Acquisition Failed", state="error")
+                        st.error("Could not retrieve market data.")
                         return
                     
                     if failed_tickers:
-                        st.warning(f"⚠️ No se pudieron analizar: {', '.join(failed_tickers)}")
+                        st.warning(f"⚠️ Skipped: {', '.join(failed_tickers)}")
                     
                     # Map UI model names to actual API model names
                     model_map = {
@@ -452,22 +495,23 @@ def main():
                     }
                     selected_model = model_map.get(model_info, "gpt-5.1")
                     
-                    status.write(f"🧠 **Paso 2/3: Invocando AI Portfolio Manager ({model_info})...**")
+                    status.write(f"🧠 **Phase 2: Engaging Portfolio Manager Agent ({model_info})...**")
                     
                     # Generar recomendación
                     recommendation, excel_data, metrics = recommend_capital_distribution(
                         capital_amount=capital_amount,
                         tickers_data=tickers_data,
                         model=selected_model,
-                        reasoning_effort=reasoning_effort
+                        reasoning_effort=reasoning_effort,
+                        progress_callback=lambda msg: status.write(msg)
                     )
                     
-                    status.write("✅ Recomendación generada.")
-                    status.update(label="✨ ¡Distribución Completada!", state="complete", expanded=False)
+                    status.write("✅ Strategy Generated.")
+                    status.update(label="✨ Allocation Strategy Ready", state="complete", expanded=False)
                     
                 except Exception as e:
-                    status.update(label="❌ Error Inesperado", state="error")
-                    st.error(f"Ocurrió un error: {e}")
+                    status.update(label="❌ System Error", state="error")
+                    st.error(f"An error occurred: {e}")
                     print(Fore.RED + f"ERROR: {e}")
                     return
             
@@ -526,11 +570,11 @@ def main():
                 
                 with tab_debug1:
                     st.subheader("Resumen del Análisis")
-                    st.dataframe(excel_data['df_resumen'], width="stretch", hide_index=True)
+                    st.dataframe(excel_data['df_resumen'], use_container_width=True, hide_index=True)
                 
                 with tab_debug2:
                     st.subheader("Indicadores Técnicos Completos")
-                    st.dataframe(excel_data['df_technical'], width="stretch", hide_index=True)
+                    st.dataframe(excel_data['df_technical'], use_container_width=True, hide_index=True)
                     
                     # Visualización adicional: Comparación de RSI
                     st.markdown("#### Comparación de Indicadores")
