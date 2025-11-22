@@ -3,9 +3,10 @@ import os
 from dotenv import load_dotenv
 from colorama import Fore, Style, init
 import pandas as pd
-from datetime import datetime
+from datetime import datetime, timedelta
 import json
 import time
+import io
 
 init(autoreset=True)
 
@@ -16,6 +17,18 @@ if not api_key:
     raise ValueError("❌ ERROR: No se encontró la API Key en el archivo .env")
 
 client = OpenAI(api_key=api_key)
+
+def _validate_model_name(model_name):
+    """
+    Maps UI model names to valid OpenAI API model names.
+    """
+    model_map = {
+        "GPT-5.1 (Latest)": "gpt-5.1",
+        "GPT-4o (Legacy)": "gpt-4o",
+        "gpt-5.1": "gpt-5.1",
+        "gpt-4o": "gpt-4o"
+    }
+    return model_map.get(model_name, "gpt-5.1")
 
 def analyze_stock(ticker, data, model="gpt-5.1", reasoning_effort="none"):
     """
@@ -29,6 +42,7 @@ def analyze_individual_stock_deeply(ticker, data, model="gpt-5.1", reasoning_eff
     NO ASUME TENDENCIAS. Analiza indicadores técnicos fríamente y noticias de largo/corto plazo.
     """
     start_time = time.time()
+    valid_model = _validate_model_name(model)
     
     # Extract data
     wk_data = data.get('weekly', {})
@@ -40,14 +54,45 @@ def analyze_individual_stock_deeply(ticker, data, model="gpt-5.1", reasoning_eff
         dy_data = data
         wk_data = data
         
-    # Format news for the prompt (distinguish recent vs older)
-    news_text = ""
+    # --- NEWS STRATEGY: EARNINGS CYCLE (90 Days vs 5 Days) ---
+    catalyst_news = []
+    context_news = []
+    
     if isinstance(news_data, list):
-        news_text = "--- NOTICIAS RECIENTES (Últimos 60 días) ---\n"
-        for n in news_data[:25]: # Top 25 news
-            news_text += f"- [{n.get('published')}] {n.get('title')} ({n.get('source')})\n"
+        today = datetime.now()
+        for n in news_data:
+            try:
+                # Parse date (assuming format YYYY-MM-DD or similar, handled by news agent)
+                pub_date_str = n.get('published', '')
+                # Simple heuristic: If it says "hours ago" or "days ago" or matches recent date
+                # Assuming ISO YYYY-MM-DD for now as per data_loader.
+                pub_date = datetime.strptime(pub_date_str[:10], "%Y-%m-%d")
+                days_diff = (today - pub_date).days
+                
+                if days_diff <= 5:
+                    catalyst_news.append(n)
+                else:
+                    context_news.append(n)
+            except:
+                # If date parsing fails, put in context to be safe unless it looks very recent
+                context_news.append(n)
+    
+    # Format for Prompt
+    catalyst_text = ""
+    if catalyst_news:
+        catalyst_text = "--- ⚡ CATALIZADORES (Últimos 5 días - ACCIÓN INMEDIATA) ---\n"
+        for n in catalyst_news:
+            catalyst_text += f"- [{n.get('published')}] {n.get('title')} ({n.get('source')})\n"
     else:
-        news_text = f"Noticias: {str(news_data)[:500]}"
+        catalyst_text = "No hay noticias de alto impacto en los últimos 5 días.\n"
+        
+    context_text = ""
+    if context_news:
+        context_text = "--- 🏗️ CONTEXTO (Últimos 90 días - SUELO FUNDAMENTAL / EARNINGS) ---\n"
+        for n in context_news[:15]: # Limit context to top 15 relevant
+            context_text += f"- [{n.get('published')}] {n.get('title')} ({n.get('source')})\n"
+    else:
+        context_text = "No hay noticias de contexto relevante.\n"
 
     system_prompt = f"""
     Eres un Analista Técnico y Fundamental Senior. Tu trabajo es analizar el activo {ticker} de forma INDIVIDUAL y OBJETIVA.
@@ -58,10 +103,10 @@ def analyze_individual_stock_deeply(ticker, data, model="gpt-5.1", reasoning_eff
         -   Usa los datos SEMANALES para el contexto macro (El Juez).
         -   Usa los datos DIARIOS para el timing preciso (El Francotirador).
         -   Si el precio está lejos de la EMA 200, dilo. Si el RSI está en 80, dilo.
-    3.  **ANÁLISIS DE NOTICIAS (CRUCIAL)**:
-        -   Analiza las noticias proporcionadas (que cubren hasta 60 días).
-        -   **Largo Plazo (>30 días)**: ¿Qué dicen las noticias de hace un mes? ¿Hay una tendencia fundamental de fondo?
-        -   **Corto Plazo (<7 días)**: ¿Hay noticias recientes que afecten el precio HOY?
+    3.  **ANÁLISIS DE NOTICIAS (ESTRATEGIA EARNINGS CYCLE)**:
+        -   **CONTEXTO (90 Días)**: Busca en las noticias antiguas. ¿Cómo fueron los últimos resultados (Earnings)? ¿La empresa crece o decrece? Este es el "Suelo Fundamental".
+        -   **CATALIZADOR (5 Días)**: ¿Qué pasó ESTA SEMANA? ¿Hay algo que mueva el precio HOY? (Rumores, Upgrades, Datos Macro).
+        -   *Diferencia claramente entre el ruido de hoy y la realidad de la empresa.*
     4.  **SALIDA ACCIONABLE**:
         -   Debes dar una recomendación clara: COMPRAR, VENDER, o ESPERAR.
         -   **TIMING**: Si recomiendas esperar, di CUÁNTO (ej: "Espera 3 días a que baje el RSI").
@@ -81,7 +126,9 @@ def analyze_individual_stock_deeply(ticker, data, model="gpt-5.1", reasoning_eff
     - MACD Histograma: {dy_data.get('macd_hist')}
     - ADX (Fuerza): {dy_data.get('adx')}
     
-    {news_text}
+    {catalyst_text}
+    
+    {context_text}
     
     ### FORMATO DE RESPUESTA (MARKDOWN):
     
@@ -91,9 +138,9 @@ def analyze_individual_stock_deeply(ticker, data, model="gpt-5.1", reasoning_eff
     *   **Semanal (Macro)**: [Análisis objetivo. ¿Es alcista, bajista o lateral? ¿Por qué?]
     *   **Diario (Timing)**: [Análisis de entrada. ¿Está caro o barato hoy? ¿RSI sobrecomprado?]
     
-    **2. Análisis de Noticias (Sentimiento)**
-    *   **Tendencia Largo Plazo (>30d)**: [Resumen del sentimiento general de las noticias antiguas]
-    *   **Eventos Corto Plazo**: [Noticias recientes clave y su impacto inmediato]
+    **2. Análisis de Noticias (Earnings Cycle)**
+    *   **Suelo Fundamental (Contexto 90d)**: [¿Qué dicen los últimos Earnings/Trimestre? ¿La empresa va bien?]
+    *   **Catalizador Inmediato (5d)**: [¿Hay noticias esta semana que justifiquen entrar YA?]
     
     **3. CONCLUSIÓN Y TIMING**
     *   **Veredicto**: [COMPRAR / VENDER / ESPERAR]
@@ -103,12 +150,12 @@ def analyze_individual_stock_deeply(ticker, data, model="gpt-5.1", reasoning_eff
 
     try:
         response = client.chat.completions.create(
-            model=model,
+            model=valid_model,
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": f"Analiza {ticker} ahora."}
             ],
-            reasoning_effort=reasoning_effort if model == "gpt-5.1" else None
+            reasoning_effort=reasoning_effort if valid_model == "gpt-5.1" else None
         )
         
         analysis = response.choices[0].message.content
@@ -135,6 +182,7 @@ def recommend_capital_distribution(capital_amount, tickers_data, model="gpt-5.1"
     """
     start_time = time.time()
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    valid_model = _validate_model_name(model)
     
     print(Fore.CYAN + f"\n🚀 Iniciando Análisis Profundo de {len(tickers_data)} activos...")
     
@@ -210,12 +258,12 @@ def recommend_capital_distribution(capital_amount, tickers_data, model="gpt-5.1"
     
     try:
         response = client.chat.completions.create(
-            model=model,
+            model=valid_model,
             messages=[
                 {"role": "system", "content": boss_system_prompt},
                 {"role": "user", "content": boss_user_prompt}
             ],
-            reasoning_effort=reasoning_effort if model == "gpt-5.1" else None
+            reasoning_effort=reasoning_effort if valid_model == "gpt-5.1" else None
         )
         
         final_verdict = response.choices[0].message.content
@@ -233,8 +281,9 @@ def recommend_capital_distribution(capital_amount, tickers_data, model="gpt-5.1"
             }
         }
         
-        # --- Generación de Excel para Debugging ---
+        # --- Generación de Excel para Debugging (IN MEMORY) ---
         filename = f"analysis_debug_{timestamp}.xlsx"
+        output = io.BytesIO()
         
         # Sheet 1: Resumen
         df_resumen = pd.DataFrame({
@@ -268,10 +317,24 @@ def recommend_capital_distribution(capital_amount, tickers_data, model="gpt-5.1"
             })
         df_technical = pd.DataFrame(tech_rows)
         
-        with pd.ExcelWriter(filename, engine='openpyxl') as writer:
+        with pd.ExcelWriter(output, engine='openpyxl') as writer:
             df_resumen.to_excel(writer, sheet_name='Resumen', index=False)
             df_individual.to_excel(writer, sheet_name='Individual_Reports', index=False)
             df_response.to_excel(writer, sheet_name='Final_Verdict', index=False)
             df_technical.to_excel(writer, sheet_name='Technical_Data', index=False)
+            
+        excel_data = {
+            'filename': filename,
+            'excel_bytes': output.getvalue(), # Return bytes directly
+            'df_resumen': df_resumen,
+            'df_technical': df_technical, 
+            'df_news': df_individual, # Reusing this slot for reports in the UI
+            'df_prompt': pd.DataFrame({'Tipo': ['System Prompt'], 'Contenido': [boss_system_prompt]}),
+            'df_response': df_response
+        }
+        
+        return final_verdict, excel_data, metrics
+
+    except Exception as e:
         print(Fore.RED + f"ERROR en recommend_capital_distribution: {e}")
         return f"Error: {str(e)}", None, None

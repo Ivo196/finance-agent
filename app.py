@@ -213,7 +213,7 @@ def create_dashboard(df, ticker):
     
     return fig
 
-@st.cache_data(ttl=300)  # Cache for 5 minutes
+@st.cache_data(ttl=300, show_spinner=False)  # Cache for 5 minutes
 def get_cached_market_data(ticker):
     """Cached wrapper around get_multi_timeframe_data"""
     return get_multi_timeframe_data(ticker)
@@ -261,7 +261,7 @@ def main():
         capital_amount = st.number_input("Monto a Invertir ($)", min_value=10.0, value=300.0, step=10.0, help="Ingresa cuánto dinero quieres invertir")
         
         # Tus acciones del portafolio (siempre incluidas)
-        portfolio_tickers = ["AAPL", "NVDA", "TSLA", "BABA", "INTC", "MELI", "KO", "AMD", "NFLX"]
+        portfolio_tickers = ["AAPL", "NVDA", "TSLA"]
         
         st.caption(f"📊 Tu Portfolio: {', '.join(portfolio_tickers)}")
         
@@ -313,7 +313,6 @@ def main():
                 
                 status.write(f"✅ Datos recibidos: Precio ${daily_price} | Tendencia {daily_trend}")
                 
-                # Map UI model names to actual API model names
                 model_map = {
                     "GPT-5.1 (Latest)": "gpt-5.1",  # GPT-4o is the latest available
                     "GPT-4o (Legacy)": "gpt-4o"  # Use mini for legacy
@@ -420,6 +419,7 @@ def main():
                     failed_tickers = []
                     
                     for ticker_symbol in selected_tickers:
+                        status.update(label=f"⏳ Obteniendo datos de {ticker_symbol}...", state="running")
                         print(Fore.YELLOW + f"   [Debug] Procesando {ticker_symbol}...")
                         status.write(f"🔄 Procesando {ticker_symbol}...")
                         try:
@@ -505,11 +505,9 @@ def main():
                 
                 # Botón de descarga del Excel
                 try:
-                    with open(excel_data['filename'], 'rb') as f:
-                        excel_bytes = f.read()
                     st.download_button(
                         label="📥 Descargar Excel Completo",
-                        data=excel_bytes,
+                        data=excel_data['excel_bytes'],
                         file_name=excel_data['filename'],
                         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                         help="Descarga el análisis completo en formato Excel"
@@ -564,11 +562,11 @@ def main():
                 
                 with tab_debug5:
                     st.subheader("Respuesta Completa del LLM")
-                    st.info(f"**Modelo usado:** {excel_data['df_response'].iloc[0]['Valor']}")
+                    st.info(f"**Modelo usado:** {excel_data['df_resumen'].iloc[0]['Modelo']}")
                     st.markdown("**Recomendación:**")
                     st.text_area(
                         label="Respuesta", 
-                        value=excel_data['df_response'].iloc[2]['Valor'], 
+                        value=excel_data['df_response'].iloc[0]['Final_Verdict'], 
                         height=300,
                         label_visibility="collapsed"
                     )

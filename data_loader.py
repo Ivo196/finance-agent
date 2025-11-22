@@ -47,7 +47,7 @@ def classify_trend(hist):
         else:
             return "Bajista Débil"
 
-def get_market_data(ticker, interval="1d"):
+def get_market_data(ticker, interval="1d", fetch_news=True):
     try:
         print(Fore.CYAN + f"   [Data] 📡 Iniciando descarga de datos para {ticker} ({interval})...")
         stock = yf.Ticker(ticker)
@@ -96,34 +96,36 @@ def get_market_data(ticker, interval="1d"):
         # --- 3. NOTICIAS ---
         raw_news = []
         news_summary = []
-        try:
-            # Determine news timeframe based on analysis interval
-            # User requested "maximum days possible", so we are being generous
-            news_days = 7  # 1 week for daily analysis
-            if interval == "1wk":
-                news_days = 30 # 1 month for weekly analysis
-            elif interval == "1mo":
-                news_days = 90 # 3 months for monthly analysis
+        
+        if fetch_news:
+            try:
+                # Determine news timeframe based on analysis interval
+                # User requested "maximum days possible", so we are being generous
+                news_days = 7  # 1 week for daily analysis
+                if interval == "1wk":
+                    news_days = 30 # 1 month for weekly analysis
+                elif interval == "1mo":
+                    news_days = 90 # 3 months for monthly analysis
+                    
+                print(Fore.YELLOW + f"   [News] 📰 Buscando noticias de {ticker} (últimos {news_days} días)...")
+                from news_agents import NewsAggregator
+                aggregator = NewsAggregator()
+                raw_news = aggregator.get_consolidated_news(ticker, days=news_days)
                 
-            print(Fore.YELLOW + f"   [News] 📰 Buscando noticias de {ticker} (últimos {news_days} días)...")
-            from news_agents import NewsAggregator
-            aggregator = NewsAggregator()
-            raw_news = aggregator.get_consolidated_news(ticker, days=news_days)
-            
-            if raw_news:
-                print(Fore.GREEN + f"   [News] ✅ Se encontraron {len(raw_news)} noticias relevantes.")
-                for n in raw_news[:15]: # Increased summary limit to 15
-                    date_str = n.get('published', 'Reciente')
-                    title = n.get('title', 'Sin título')
-                    source = n.get('source', 'Desconocido')
-                    # Format: [YYYY-MM-DD HH:MM] (Source) Title
-                    news_summary.append(f"- [{date_str}] ({source}) {title}")
-            else:
-                 print(Fore.RED + "   [News] ❌ No se encontraron noticias en ninguna fuente.")
+                if raw_news:
+                    print(Fore.GREEN + f"   [News] ✅ Se encontraron {len(raw_news)} noticias relevantes.")
+                    for n in raw_news[:15]: # Increased summary limit to 15
+                        date_str = n.get('published', 'Reciente')
+                        title = n.get('title', 'Sin título')
+                        source = n.get('source', 'Desconocido')
+                        # Format: [YYYY-MM-DD HH:MM] (Source) Title
+                        news_summary.append(f"- [{date_str}] ({source}) {title}")
+                else:
+                     print(Fore.RED + "   [News] ❌ No se encontraron noticias en ninguna fuente.")
 
-        except Exception as e:
-            print(Fore.RED + f"   [News] ⚠️ Fallo en noticias: {e}")
-            news_summary.append("No se pudieron descargar noticias recientes.")
+            except Exception as e:
+                print(Fore.RED + f"   [News] ⚠️ Fallo en noticias: {e}")
+                news_summary.append("No se pudieron descargar noticias recientes.")
 
         # --- 4. EMPAQUETADO ---
         close_price = last.get('Close', 0)
@@ -170,27 +172,27 @@ def get_multi_timeframe_data(ticker):
     
     # 1. The Judge (Weekly)
     # We don't need news from here, just technicals
-    wk_data, wk_hist, _, wk_error = get_market_data(ticker, interval="1wk")
+    wk_data, wk_hist, _, wk_error = get_market_data(ticker, interval="1wk", fetch_news=False)
     if wk_error:
         return None, wk_error
         
     # 2. The Sniper (Daily)
     # We don't need news from here either, we will fetch it separately to control the range
-    dy_data, dy_hist, _, dy_error = get_market_data(ticker, interval="1d")
+    dy_data, dy_hist, _, dy_error = get_market_data(ticker, interval="1d", fetch_news=False)
     if dy_error:
         return None, dy_error
 
-    # 3. Comprehensive News (60 Days for Long Term + Short Term)
-    print(Fore.YELLOW + f"   [News] 📰 Buscando noticias extendidas de {ticker} (últimos 60 días)...")
+    # 3. Comprehensive News (90 Days for Earnings Cycle + Short Term)
+    print(Fore.YELLOW + f"   [News] 📰 Buscando noticias extendidas de {ticker} (últimos 90 días - Earnings Cycle)...")
     from news_agents import NewsAggregator
     aggregator = NewsAggregator()
-    # Fetch 60 days to cover "beyond 30 days" requirement
-    raw_news = aggregator.get_consolidated_news(ticker, days=60)
+    # Fetch 90 days to cover "Earnings Cycle" requirement
+    raw_news = aggregator.get_consolidated_news(ticker, days=90)
     
     news_summary = []
     if raw_news:
         print(Fore.GREEN + f"   [News] ✅ Se encontraron {len(raw_news)} noticias relevantes.")
-        for n in raw_news[:20]: # Increased summary limit
+        for n in raw_news[:25]: # Increased summary limit
             date_str = n.get('published', 'Reciente')
             title = n.get('title', 'Sin título')
             source = n.get('source', 'Desconocido')
